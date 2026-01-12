@@ -1,0 +1,55 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+}
+
+header {
+    text-align: center;
+    padding: 20px;
+    background: #222;
+    color: white;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+.card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: 0.3s;
+}
+
+.card:hover {
+    transform: scale(1.05);
+}
+
+.crypto-img {
+    width: 40px;
+    height: 40px;
+}
+
+.card h3 {
+    margin: 10px 0 5px 0;
+}
+
+.price {
+    font-weight: bold;
+    color: green;
+}
+
+.search {
+    margin-top: 15px;
+    padding: 10px;
+    width: 60%;
+    max-width: 300px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
