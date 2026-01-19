@@ -89,3 +89,164 @@ https://Onyx2006.github.io/CryptoApp
 - JavaScript
 - Fetch API
 - GitHub Pages (esto no lo conocía y es muy práctico para prácticas o para subir mi portfolio por ejemplo)
+
+
+<p align="center">
+  <img src="docs/banner-agora.png" alt="Ágora – Plataforma de votación digital" width="800"/>
+</p>
+
+
+<h1 align="center">Ágora</h1>
+
+
+<p align="center">
+  Plataforma de votación digital segura para administraciones públicas
+</p>
+
+
+<p align="center">
+  <img src="https://img.shields.io/badge/estado-en%20desarrollo-blue" />
+  <img src="https://img.shields.io/badge/seguridad-TLS%20%2B%20Certificado%20electr%C3%B3nico-green" />
+  <img src="https://img.shields.io/badge/blockchain-Hyperledger%20Besu-purple" />
+  <img src="https://img.shields.io/badge/infraestructura-Docker%20%2B%20Apache-orange" />
+  <img src="https://img.shields.io/badge/enfoque-Administraci%C3%B3n%20P%C3%BAblica-black" />
+</p>
+
+
+
+⸻
+
+🏛️ Visión
+
+Ágora es una plataforma de votación electrónica diseñada específicamente para administraciones públicas y organismos que requieren máximo nivel de seguridad, trazabilidad y confianza jurídica en sus procesos de participación y toma de decisiones.
+
+El sistema responde a los principales retos de la digitalización pública:
+	•	Autenticación fuerte de los ciudadanos.
+	•	Garantía de integridad del voto.
+	•	Transparencia y auditabilidad.
+	•	Escalabilidad ante procesos masivos.
+	•	Cumplimiento normativo y protección de datos.
+
+⸻
+
+🎯 Propuesta de valor
+
+Ágora convierte los procesos de votación en entornos digitales fiables, verificables y resistentes a manipulaciones.
+
+Beneficios clave
+	•	🔐 Identidad garantizada mediante certificado electrónico.
+	•	⛓️ Voto inmutable gracias al registro en blockchain privada.
+	•	📊 Resultados transparentes y visuales en tiempo real.
+	•	🏗️ Arquitectura escalable preparada para alta concurrencia.
+	•	📑 Trazabilidad completa para auditorías y control institucional.
+
+⸻
+
+🏗️ Arquitectura del sistema
+
+<p align="center">
+  <img src="docs/arquitectura-agora.png" width="700"/>
+</p>
+
+
+Ágora se apoya en una arquitectura modular y distribuida:
+	•	Frontend web
+	•	Interfaz clara, accesible y responsive.
+	•	Visualización de resultados mediante gráficos interactivos.
+	•	Backend
+	•	Lógica de negocio y control de procesos electorales.
+	•	Validación de certificados electrónicos.
+	•	Base de datos relacional
+	•	Gestión de usuarios, procesos y metadatos.
+	•	Control de accesos y registros de auditoría.
+	•	Blockchain privada (Hyperledger Besu)
+	•	Registro inmutable de votos.
+	•	Red privada con múltiples nodos.
+
+⸻
+
+🔐 Seguridad y cumplimiento
+
+La seguridad no es un añadido, es el núcleo del sistema:
+	•	Autenticación mediante certificado electrónico.
+	•	Comunicación cifrada con TLS/HTTPS.
+	•	Separación de responsabilidades entre capas.
+	•	Registro de eventos para auditoría.
+	•	Diseño alineado con RGPD y principios de protección de datos.
+
+⸻
+
+⛓️ Integridad del voto mediante blockchain
+
+Cada voto se registra como una transacción inmutable:
+	•	Los votos se agrupan en bloques.
+	•	Cada bloque incluye:
+	•	Número de bloque.
+	•	Marca temporal UTC.
+	•	Hash criptográfico del bloque anterior.
+
+Esto garantiza:
+	•	Imposibilidad de alteración posterior.
+	•	Transparencia del proceso.
+	•	Confianza institucional.
+
+⸻
+
+📊 Transparencia y resultados
+
+El sistema permite a la administración:
+	•	Consultar resultados en tiempo real.
+	•	Representarlos mediante gráficos claros y comprensibles.
+	•	Facilitar la rendición de cuentas a la ciudadanía.
+
+⸻
+
+🚀 Escalabilidad y disponibilidad
+
+Ágora está preparada para escenarios reales de uso institucional:
+	•	Despliegue con Docker.
+	•	Duplicación de instancias del backend.
+	•	Integración con balanceadores de carga.
+	•	Alta disponibilidad ante fallos de nodos.
+
+⸻
+
+🛠️ Tecnologías utilizadas
+
+Área	Tecnología
+Frontend	HTML, CSS, JavaScript, Chart.js
+Backend	Java / Symfony
+Blockchain	Hyperledger Besu
+Base de datos	MySQL / MariaDB
+Infraestructura	Docker, Apache
+Seguridad	TLS, Certificados electrónicos
+
+
+⸻
+
+📚 Documentación
+
+La documentación técnica detalla:
+	•	Despliegue e instalación.
+	•	Configuración de certificados electrónicos.
+	•	Arquitectura blockchain.
+	•	Modelo de datos.
+	•	Casos de uso institucionales.
+
+⸻
+
+🧠 Estado del proyecto
+
+Ágora se encuentra en desarrollo activo, con un enfoque profesional orientado a su aplicación en entornos reales de la administración pública.
+
+⸻
+
+👤 Autor
+
+Proyecto desarrollado con un enfoque técnico y estratégico, priorizando la confianza digital, la seguridad jurídica y la robustez del sistema.
+
+⸻
+
+Ágora no es solo una plataforma tecnológica: es una herramienta para reforzar la confianza entre las instituciones y la ciudadanía.
+
+
