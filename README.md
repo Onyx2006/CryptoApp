@@ -211,16 +211,17 @@ El sistema permite a la administración:
 
 ⸻
 
-🛠️ Tecnologías utilizadas
 
-Área	Tecnología
-Frontend	HTML, CSS, JavaScript, Chart.js
-Backend	Java / Symfony
-Blockchain	Hyperledger Besu
-Base de datos	MySQL / MariaDB
-Infraestructura	Docker, Apache
-Seguridad	TLS, Certificados electrónicos
+## 🛠️ Tecnologías utilizadas
 
+| Área | Tecnología |
+|------|------------|
+| Frontend | HTML, CSS, JavaScript, Chart.js |
+| Backend | Java / Symfony |
+| Blockchain | Hyperledger Besu |
+| Base de datos | MySQL / MariaDB |
+| Infraestructura | Docker, Apache |
+| Seguridad | TLS, Certificados electrónicos |
 
 ⸻
 
