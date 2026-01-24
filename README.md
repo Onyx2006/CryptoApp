@@ -90,14 +90,58 @@ https://Onyx2006.github.io/CryptoApp
 - Fetch API
 
 - GitHub Pages (esto no lo conocía y es muy práctico para prácticas o para subir mi portfolio por ejemplo)
-⸻
 
-👤 Autor
 
-Proyecto desarrollado con un enfoque técnico y estratégico, priorizando la confianza digital, la seguridad jurídica y la robustez del sistema.
 
-⸻
 
-Ágora no es solo una plataforma tecnológica: es una herramienta para reforzar la confianza entre las instituciones y la ciudadanía.
+# Extensión --- Datos Dinámicamente con AbortController
 
+## Objetivo
+El objetivo de esta ampliación es mejorar la aplicación web desarrollada previamente para la consulta de APIs públicas, incorporando un mecanismo que permita **gestionar y cancelar solicitudes HTTP de forma dinámica** mediante el uso de `AbortController`.  
+De esta forma se optimiza el rendimiento de la aplicación y se mejora la experiencia de usuario al evitar resultados obsoletos.
+
+## ¿Qué es AbortController y cómo mejora la aplicación?
+**AbortController** es una API nativa de JavaScript que permite cancelar operaciones asíncronas, como solicitudes HTTP realizadas con `fetch`.
+
+En esta aplicación se utiliza para cancelar peticiones en curso cuando el usuario realiza una nueva búsqueda antes de que la anterior haya finalizado. Esto permite:
+- Evitar que se muestren datos que ya no son relevantes.
+- Reducir el consumo de recursos del navegador.
+- Mejorar la fluidez y respuesta de la interfaz.
+- Garantizar que solo se procesen los resultados de la última acción del usuario.
+
+## Implementación de AbortController
+Cada vez que el usuario realiza una búsqueda, se crea un nuevo controlador.  
+Si existe una petición anterior en curso, esta se cancela automáticamente.
+
+### Creación del controlador y asociación a `fetch`
+```js
+// Se crea un nuevo controlador para la petición HTTP
+controllerActual = new AbortController();
+const { signal } = controllerActual;
+
+// Se pasa la señal al método fetch para permitir su cancelación
+fetch(url, { signal });
+
+// Un ejemplo de cancelación sería:
+if (controllerActual) {
+    controllerActual.abort();
+} 
+```
+
+
+## Gestión de errores y mejora de la experiencia de usuario
+La gestión de errores se implementó utilizando bloques `try...catch` en todas las solicitudes realizadas a la API mediante `fetch`. Este enfoque permite capturar cualquier problema que ocurra durante la comunicación con el servidor y actuar de forma controlada sin que la aplicación se rompa.
+
+En primer lugar, se distingue entre los **errores provocados por la cancelación de una solicitud** y los **errores reales de red o del servidor**.  
+Cuando una petición es cancelada mediante `AbortController`, se genera un error de tipo `AbortError`, el cual se ignora de forma intencionada, ya que forma parte del funcionamiento normal de la aplicación y no representa un fallo real.
+
+Por otro lado, si se produce un error de red, una respuesta no válida del servidor o cualquier otro problema inesperado, la aplicación muestra un mensaje claro al usuario indicando que no ha sido posible cargar los datos. De esta manera, el usuario recibe información comprensible sobre lo ocurrido sin exponer detalles técnicos innecesarios.
+
+Para mejorar la experiencia de usuario, se aplicaron varias medidas adicionales:
+- Se añadió un **indicador de carga** que se muestra mientras se esperan los resultados de la API, evitando la sensación de bloqueo o inactividad.
+- Se evita mostrar resultados obsoletos cancelando las solicitudes anteriores cuando el usuario realiza una nueva búsqueda.
+- Se muestran mensajes informativos cuando no se encuentran resultados coincidentes con la búsqueda.
+- La interfaz se actualiza dinámicamente sin recargar la página, proporcionando una interacción más fluida y moderna.
+
+Gracias a esta combinación de gestión de errores y mejoras visuales, la aplicación resulta más robusta, intuitiva y agradable para el usuario final.
 
