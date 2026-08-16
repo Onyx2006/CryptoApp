@@ -1,22 +1,196 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cryto App</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vertex — Crypto Market Terminal</title>
+<meta name="description" content="Terminal de mercado cripto en tiempo real con gráficos de velas, indicadores técnicos y watchlist. Datos vía CoinGecko API.">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>▲</text></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>Listado de Criptomonedas, en un futuro estará en el top AGORA con nuestro propio token.</h1>
-        <p>Datos obtenidos dinámicamente desde la API pública de CoinGecko</p>
-        <input type="text" id="searchInput" placeholder="Buscar criptomoneda..." class="search">
-    </header>
 
-    <main>
-        <div id="crypto-container" class="grid"></div>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 17 L9 9 L13 13 L21 4" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 4 L21 4 L21 10" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="brand-word">VERTEX</span>
+      <span class="brand-tag">market terminal</span>
+    </div>
+
+    <div class="topbar__search">
+      <svg class="search-icon" viewBox="0 0 24 24" width="15" height="15"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="searchInput" type="text" placeholder="Buscar activo — BTC, Ethereum, Solana…" autocomplete="off" spellcheck="false">
+      <div id="searchResults" class="search-results" hidden></div>
+    </div>
+
+    <div class="topbar__status">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span id="statusText">conectando…</span>
+      <a href="https://github.com/Onyx2006/CryptoApp" target="_blank" rel="noopener" class="gh-link" aria-label="Repositorio en GitHub">
+        <svg viewBox="0 0 16 16" width="17" height="17"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="workspace">
+
+    <!-- MAIN CHART COLUMN -->
+    <main class="chart-col">
+
+      <!-- Asset header / price block -->
+      <section class="asset-header" id="assetHeader">
+        <div class="asset-id">
+          <img id="assetIcon" class="asset-icon" src="" alt="">
+          <div class="asset-id__text">
+            <div class="asset-id__row">
+              <span id="assetName">Bitcoin</span>
+              <span id="assetSymbol" class="asset-symbol">BTC</span>
+              <span id="assetRank" class="asset-rank">#1</span>
+            </div>
+            <div class="asset-id__row asset-id__sub" id="assetSubRow">
+              <span id="assetPrice" class="asset-price">$—</span>
+              <span id="assetChange" class="asset-change">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="asset-stats" id="assetStats">
+          <div class="stat"><span class="stat-label">Máx 24h</span><span class="stat-value" id="statHigh">—</span></div>
+          <div class="stat"><span class="stat-label">Mín 24h</span><span class="stat-value" id="statLow">—</span></div>
+          <div class="stat"><span class="stat-label">Volumen 24h</span><span class="stat-value" id="statVol">—</span></div>
+          <div class="stat"><span class="stat-label">Cap. mercado</span><span class="stat-value" id="statCap">—</span></div>
+        </div>
+      </section>
+
+      <!-- Chart toolbar -->
+      <section class="toolbar">
+        <div class="toolbar__group" id="timeframeGroup" role="group" aria-label="Marco temporal">
+          <button class="tf-btn" data-days="1">1D</button>
+          <button class="tf-btn" data-days="7">7D</button>
+          <button class="tf-btn is-active" data-days="30">30D</button>
+          <button class="tf-btn" data-days="90">90D</button>
+          <button class="tf-btn" data-days="365">1A</button>
+        </div>
+
+        <div class="toolbar__divider"></div>
+
+        <div class="toolbar__group">
+          <div class="dropdown" id="candleDropdown">
+            <button class="dd-trigger" id="candleTrigger">
+              <svg class="dd-icon" viewBox="0 0 16 16" width="14" height="14"><rect x="2" y="4" width="2" height="8" fill="currentColor"/><rect x="1" y="6" width="4" height="4" fill="currentColor"/><rect x="7" y="1" width="2" height="12" fill="currentColor"/><rect x="6" y="4" width="4" height="6" fill="currentColor"/><rect x="12" y="3" width="2" height="9" fill="currentColor"/><rect x="11" y="6" width="4" height="4" fill="currentColor"/></svg>
+              <span id="candleLabel">Velas</span>
+              <svg class="chev" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="dd-menu" id="candleMenu">
+              <button class="dd-item is-active" data-style="candle">Velas japonesas</button>
+              <button class="dd-item" data-style="heikinashi">Heikin-Ashi</button>
+              <button class="dd-item" data-style="line">Línea</button>
+              <button class="dd-item" data-style="area">Área</button>
+              <button class="dd-item" data-style="bars">Barras OHLC</button>
+            </div>
+          </div>
+
+          <div class="dropdown" id="indicatorDropdown">
+            <button class="dd-trigger" id="indicatorTrigger">
+              <svg class="dd-icon" viewBox="0 0 16 16" width="14" height="14"><path d="M1 12l3-4 3 2 4-7 4 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Indicadores</span>
+              <span class="dd-count" id="indicatorCount" hidden>0</span>
+              <svg class="chev" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+            </button>
+            <div class="dd-menu dd-menu--wide" id="indicatorMenu">
+              <div class="dd-section-label">Superpuestos (precio)</div>
+              <label class="dd-check"><input type="checkbox" data-ind="sma20"><span class="swatch" style="--c:var(--accent-2)"></span>Media móvil simple (20)</label>
+              <label class="dd-check"><input type="checkbox" data-ind="ema50"><span class="swatch" style="--c:var(--accent)"></span>Media móvil exponencial (50)</label>
+              <label class="dd-check"><input type="checkbox" data-ind="bb"><span class="swatch" style="--c:var(--accent-3)"></span>Bandas de Bollinger (20, 2)</label>
+              <div class="dd-section-label">Paneles inferiores</div>
+              <label class="dd-check"><input type="checkbox" data-ind="rsi"><span class="swatch" style="--c:var(--accent-3)"></span>RSI (14)</label>
+              <label class="dd-check"><input type="checkbox" data-ind="macd"><span class="swatch" style="--c:var(--accent)"></span>MACD (12, 26, 9)</label>
+              <label class="dd-check"><input type="checkbox" data-ind="vol" checked><span class="swatch" style="--c:var(--text-tertiary)"></span>Volumen</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="toolbar__divider"></div>
+
+        <div class="toolbar__group toolbar__group--tools">
+          <button class="tool-btn" id="zoomOutBtn" title="Alejar" aria-label="Alejar">−</button>
+          <button class="tool-btn" id="zoomInBtn" title="Acercar" aria-label="Acercar">+</button>
+          <button class="tool-btn" id="resetBtn" title="Restablecer vista" aria-label="Restablecer vista">
+            <svg viewBox="0 0 16 16" width="14" height="14"><path d="M14 8A6 6 0 1 1 12.2 3.8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M14 2v4h-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Chart panes -->
+      <section class="chart-stage" id="chartStage">
+        <div class="chart-loading" id="chartLoading">
+          <div class="spinner"></div>
+          <span>Cargando datos de mercado…</span>
+        </div>
+        <div class="chart-error" id="chartError" hidden>
+          <span id="chartErrorText">No se han podido cargar los datos.</span>
+          <button id="chartRetryBtn">Reintentar</button>
+        </div>
+
+        <div class="pane pane--price" id="panePrice">
+          <canvas id="priceCanvas"></canvas>
+          <canvas id="priceOverlay"></canvas>
+        </div>
+        <div class="pane pane--volume" id="paneVolume">
+          <div class="pane-tag">VOL</div>
+          <canvas id="volumeCanvas"></canvas>
+        </div>
+        <div class="pane pane--rsi" id="paneRsi" hidden>
+          <div class="pane-tag">RSI 14</div>
+          <canvas id="rsiCanvas"></canvas>
+        </div>
+        <div class="pane pane--macd" id="paneMacd" hidden>
+          <div class="pane-tag">MACD 12·26·9</div>
+          <canvas id="macdCanvas"></canvas>
+        </div>
+
+        <div class="crosshair-tooltip" id="crosshairTooltip" hidden></div>
+      </section>
+
+      <p class="chart-attrib">Datos de mercado cortesía de <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a> · velas OHLC en tiempo casi real</p>
     </main>
 
-    <script src="script.js"></script>
+    <!-- WATCHLIST SIDEBAR -->
+    <aside class="watchlist">
+      <div class="watchlist__head">
+        <span>Mercados</span>
+        <span class="watchlist__count" id="watchlistCount">—</span>
+      </div>
+      <div class="watchlist__sort">
+        <button class="sort-btn is-active" data-sort="market_cap_desc">Cap. mercado</button>
+        <button class="sort-btn" data-sort="change_desc">Ganadores</button>
+        <button class="sort-btn" data-sort="change_asc">Perdedores</button>
+      </div>
+      <div class="watchlist__list" id="watchlistList">
+        <!-- rows injected by JS -->
+      </div>
+    </aside>
+
+  </div>
+
+  <footer class="app-footer">
+    <span>Vertex — proyecto de portfolio construido con JavaScript vanilla, Canvas 2D y la API pública de CoinGecko. Sin frameworks de gráficos.</span>
+    <span class="app-footer__links"><a href="https://github.com/Onyx2006/CryptoApp" target="_blank" rel="noopener">Código fuente</a></span>
+  </footer>
+
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
