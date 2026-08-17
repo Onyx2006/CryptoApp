@@ -78,6 +78,10 @@ a{ color:inherit; }
 @media (max-width:960px){
   .app{ height:auto; min-height:100vh; }
   .workspace{ grid-template-columns:1fr; overflow:visible; }
+
+  .chart-attrib{
+    margin-left: 16px !important;
+  }
 }
 
 /* Top bar */
@@ -431,6 +435,11 @@ a{ color:inherit; }
 .crosshair-tooltip b{ color:var(--text-primary); }
 .crosshair-tooltip .ch-up{ color:var(--bull); }
 .crosshair-tooltip .ch-down{ color:var(--bear); }
+
+.chart-attrib{
+  margin-left: 22px;
+  font-size: 11px;
+}
 
 /* Watchlist sidebar */
 .watchlist{
