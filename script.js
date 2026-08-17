@@ -1035,7 +1035,7 @@ async function loadCoinData() {
     applyPaneVisibility();
     setLoading(false);
     renderAll();
-    DOM.statusText.textContent = "en directo";
+    DOM.statusText.textContent = "En directo";
   } catch (err) {
     if (err.name === "AbortError") return; // expected: superseded by a newer request
     console.error("No se pudieron cargar los datos del gráfico:", err);
@@ -1071,15 +1071,15 @@ async function init() {
   });
 
   try {
-    DOM.statusText.textContent = "cargando mercados…";
+    DOM.statusText.textContent = "Cargando mercados…";
     state.markets = await fetchMarkets();
-    DOM.statusText.textContent = "en directo";
+    DOM.statusText.textContent = "En directo";
     renderWatchlist();
     const bitcoin = state.markets.find((m) => m.id === "bitcoin") || state.markets[0];
     selectCoin(bitcoin);
   } catch (err) {
     console.error(err);
-    DOM.statusText.textContent = "error de conexión";
+    DOM.statusText.textContent = "Error de conexión";
     setError("No se ha podido conectar con la API de CoinGecko. Comprueba tu conexión o inténtalo de nuevo en unos minutos.");
     DOM.watchlistList.innerHTML = '<div class="search-empty">No se pudieron cargar los mercados.</div>';
   }
