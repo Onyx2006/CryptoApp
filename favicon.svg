@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#141a29"/>
+      <stop offset="100%" stop-color="#090c12"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <rect width="64" height="64" rx="15" fill="none" stroke="#212838" stroke-width="1"/>
+
+  <!-- candle 1 (bear) -->
+  <line x1="17" y1="17" x2="17" y2="47" stroke="#FF5470" stroke-width="2" stroke-linecap="round"/>
+  <rect x="12.5" y="27" width="9" height="14" rx="1.5" fill="#FF5470"/>
+
+  <!-- candle 2 (bull, tallest) -->
+  <line x1="32" y1="10" x2="32" y2="46" stroke="#17C995" stroke-width="2" stroke-linecap="round"/>
+  <rect x="27.5" y="16" width="9" height="22" rx="1.5" fill="#17C995"/>
+
+  <!-- candle 3 (bull) -->
+  <line x1="47" y1="15" x2="47" y2="41" stroke="#17C995" stroke-width="2" stroke-linecap="round"/>
+  <rect x="42.5" y="19" width="9" height="16" rx="1.5" fill="#17C995"/>
+</svg>
