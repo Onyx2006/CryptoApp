@@ -87,7 +87,33 @@ const state = {
   isPanning: false,
   panStartX: 0,
   panStartOffset: 0,
+  // vertical scale applied to each pane's value axis — adjusted by dragging
+  // the right-hand axis (price / indicator numbers) up (zoom in) or down (zoom out)
+  paneScale: { price: 1, volume: 1, rsi: 1, macd: 1 },
+  axisDrag: { active: false, pane: null, startY: 0, startScale: 1, pointerId: null },
+  pointers: new Map(), // active pointers, for touch pan + pinch-to-zoom
+  pinch: { active: false, startDist: 0, startCount: 90 },
 };
+
+const SCALE_MIN = 0.35;
+const SCALE_MAX = 4;
+
+function clampScale(v) {
+  return Math.max(SCALE_MIN, Math.min(SCALE_MAX, v));
+}
+
+/* Rescale a [min,max] value range around a fixed anchor.
+   anchor "center" keeps the midpoint fixed (price / RSI / MACD panes);
+   anchor "zero" keeps the baseline fixed at 0 (volume bars grow from the bottom). */
+function applyPaneScale(min, max, scale, anchor) {
+  if (!scale || scale === 1) return { min, max };
+  if (anchor === "zero") {
+    return { min, max: min + (max - min) / scale };
+  }
+  const center = (min + max) / 2;
+  const half = (max - min) / 2 / scale;
+  return { min: center - half, max: center + half };
+}
 
 let currentController = null; // AbortController for the active chart data fetch
 
@@ -425,6 +451,7 @@ function drawPricePane() {
   const pad = (max - min) * 0.08 || max * 0.01 || 1;
   min -= pad;
   max += pad;
+  ({ min, max } = applyPaneScale(min, max, state.paneScale.price, "center"));
 
   const top = topPad, bottom = h - bottomPad;
   const y = (price) => priceToY(price, min, max, top, bottom);
@@ -557,7 +584,8 @@ function drawVolumePane() {
   if (!state.candles.length || !state._geom) return;
   const { start, end, count, plotWidth } = state._geom;
   const topPad = 6, bottomPad = lastActivePane() === "vol" ? PANE_MARGIN_BOTTOM_AXIS : 4;
-  const max = Math.max(...state.volumes.slice(start, end), 1);
+  let max = Math.max(...state.volumes.slice(start, end), 1);
+  ({ max } = applyPaneScale(0, max, state.paneScale.volume, "zero"));
   const top = topPad, bottom = h - bottomPad;
   drawPriceAxis(ctx, w, h, 0, max, top, h - bottom, fmtCompact);
   if (lastActivePane() === "vol") drawTimeAxis(ctx, w, h, start, end);
@@ -584,10 +612,11 @@ function drawRsiPane() {
   const { start, end, count, plotWidth } = state._geom;
   const topPad = 10, bottomPad = lastActivePane() === "rsi" ? PANE_MARGIN_BOTTOM_AXIS : 6;
   const top = topPad, bottom = h - bottomPad;
-  drawPriceAxis(ctx, w, h, 0, 100, top, h - bottom, (v) => v.toFixed(0));
+  const { min: rsiMin, max: rsiMax } = applyPaneScale(0, 100, state.paneScale.rsi, "center");
+  drawPriceAxis(ctx, w, h, rsiMin, rsiMax, top, h - bottom, (v) => v.toFixed(0));
   if (lastActivePane() === "rsi") drawTimeAxis(ctx, w, h, start, end);
 
-  const y = (v) => priceToY(v, 0, 100, top, bottom);
+  const y = (v) => priceToY(v, rsiMin, rsiMax, top, bottom);
   ctx.save();
   ctx.setLineDash([3, 3]);
   ctx.strokeStyle = "rgba(255,84,112,0.4)";
@@ -632,6 +661,7 @@ function drawMacdPane() {
   if (min === max) { min -= 1; max += 1; }
   const padv = (max - min) * 0.15;
   min -= padv; max += padv;
+  ({ min, max } = applyPaneScale(min, max, state.paneScale.macd, "center"));
 
   drawPriceAxis(ctx, w, h, min, max, top, h - bottom, (v) => v.toFixed(2));
   if (lastActivePane() === "macd") drawTimeAxis(ctx, w, h, start, end);
@@ -682,29 +712,87 @@ function renderAll() {
   hideCrosshair();
 }
 
-/* CROSSHAIR */
-function setupCrosshair() {
-  const canvases = [
-    { el: DOM.priceCanvas, pane: DOM.panePrice },
-    { el: DOM.volumeCanvas, pane: DOM.paneVolume },
-    { el: DOM.rsiCanvas, pane: DOM.paneRsi },
-    { el: DOM.macdCanvas, pane: DOM.paneMacd },
-  ];
-
-  canvases.forEach(({ el }) => {
-    el.addEventListener("mousemove", onCrosshairMove);
-    el.addEventListener("mouseleave", hideCrosshair);
-    el.addEventListener("mousedown", onPanStart);
-    el.addEventListener("wheel", onWheelZoom, { passive: false });
-  });
-  window.addEventListener("mousemove", onPanMove);
-  window.addEventListener("mouseup", onPanEnd);
+/* Redraw a single pane — used while dragging its value axis so we don't pay
+   the cost of re-measuring/redrawing every canvas on each pointermove. */
+function renderPane(key) {
+  if (!state.candles.length) return;
+  if (key === "price") { drawPricePane(); return; }
+  if (key === "volume") { drawVolumePane(); return; }
+  if (key === "rsi") { drawRsiPane(); return; }
+  if (key === "macd") { drawMacdPane(); return; }
 }
 
-function onCrosshairMove(e) {
+/* CROSSHAIR, PAN, ZOOM & AXIS DRAG-TO-SCALE */
+const AXIS_DRAG_SENSITIVITY = 140; // px of vertical drag needed to ~double/halve the scale
+
+function setupCrosshair() {
+  const panes = [
+    { el: DOM.priceCanvas, key: "price" },
+    { el: DOM.volumeCanvas, key: "volume" },
+    { el: DOM.rsiCanvas, key: "rsi" },
+    { el: DOM.macdCanvas, key: "macd" },
+  ];
+
+  panes.forEach(({ el, key }) => {
+    el.style.touchAction = "none"; // we handle pan/zoom/scroll ourselves
+    el.addEventListener("pointerdown", (e) => onPointerDown(e, key));
+    el.addEventListener("pointermove", (e) => onPointerHover(e, key));
+    el.addEventListener("pointerleave", () => { if (!state.isPanning && !state.axisDrag.active) hideCrosshair(); });
+    el.addEventListener("dblclick", (e) => onAxisDoubleClick(e, key));
+    el.addEventListener("wheel", onWheelZoom, { passive: false });
+  });
+  window.addEventListener("pointermove", onPointerMoveGlobal);
+  window.addEventListener("pointerup", onPointerUpGlobal);
+  window.addEventListener("pointercancel", onPointerUpGlobal);
+}
+
+function isInAxisZone(e) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  return x > rect.width - PANE_MARGIN_RIGHT;
+}
+
+function onPointerDown(e, key) {
+  if (!state.candles.length) return;
+  state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  // two fingers down anywhere on a pane => start pinch-to-zoom (horizontal)
+  if (state.pointers.size === 2) {
+    state.axisDrag.active = false;
+    state.isPanning = false;
+    const pts = [...state.pointers.values()];
+    state.pinch.active = true;
+    state.pinch.startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    state.pinch.startCount = state.view.count;
+    hideCrosshair();
+    return;
+  }
+
+  if (isInAxisZone(e)) {
+    // drag on the right-hand value axis (price or indicator numbers) to rescale it:
+    // drag up = zoom in / enlarge, drag down = zoom out / shrink
+    state.axisDrag.active = true;
+    state.axisDrag.pane = key;
+    state.axisDrag.startY = e.clientY;
+    state.axisDrag.startScale = state.paneScale[key];
+    state.axisDrag.pointerId = e.pointerId;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    hideCrosshair();
+  } else {
+    state.isPanning = true;
+    state.panStartX = e.clientX;
+    state.panStartOffset = state.view.offset;
+  }
+}
+
+function onPointerHover(e, key) {
+  if (state.pointers.has(e.pointerId)) state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (state.axisDrag.active || state.isPanning || state.pinch.active) return;
+
+  e.currentTarget.style.cursor = isInAxisZone(e) ? "ns-resize" : "crosshair";
+
   if (!state._geom || !state.candles.length) return;
-  if (state.isPanning) return;
-  const rect = e.target.getBoundingClientRect();
+  const rect = e.currentTarget.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const { start, count, plotWidth } = state._geom;
   const slot = plotWidth / count;
@@ -712,6 +800,56 @@ function onCrosshairMove(e) {
   idx = Math.max(0, Math.min(state.candles.length - 1, idx));
   state.hoverIndex = idx;
   drawOverlayCrosshair(e, idx);
+}
+
+function onAxisDoubleClick(e, key) {
+  if (!isInAxisZone(e)) return;
+  state.paneScale[key] = 1;
+  renderAll();
+}
+
+function onPointerMoveGlobal(e) {
+  if (state.pointers.has(e.pointerId)) state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (state.pinch.active && state.pointers.size === 2) {
+    const pts = [...state.pointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    const ratio = dist / state.pinch.startDist;
+    const total = state.candles.length;
+    const center = state.view.offset + state.view.count / 2;
+    state.view.count = Math.max(15, Math.min(total, Math.round(state.pinch.startCount / ratio)));
+    state.view.offset = Math.round(center - state.view.count / 2);
+    clampView();
+    renderAll();
+    return;
+  }
+
+  if (state.axisDrag.active) {
+    const delta = state.axisDrag.startY - e.clientY; // up = positive = zoom in
+    const factor = Math.pow(2, delta / AXIS_DRAG_SENSITIVITY);
+    state.paneScale[state.axisDrag.pane] = clampScale(state.axisDrag.startScale * factor);
+    renderPane(state.axisDrag.pane);
+    return;
+  }
+
+  if (state.isPanning && state._geom) {
+    const dx = e.clientX - state.panStartX;
+    const slot = state._geom.plotWidth / state._geom.count;
+    const deltaCandles = Math.round(-dx / slot);
+    state.view.offset = state.panStartOffset + deltaCandles;
+    clampView();
+    renderAll();
+  }
+}
+
+function onPointerUpGlobal(e) {
+  state.pointers.delete(e.pointerId);
+  if (state.pointers.size < 2) state.pinch.active = false;
+  if (state.axisDrag.pointerId === e.pointerId) {
+    state.axisDrag.active = false;
+    state.axisDrag.pointerId = null;
+  }
+  state.isPanning = false;
 }
 
 function hideCrosshair() {
@@ -768,6 +906,7 @@ function drawOverlayCrosshair(e, idx) {
   let left = paneRect.left - stageRect.left + x + 14;
   let top2 = paneRect.top - stageRect.top + 10;
   if (left + 160 > stageRect.width) left = paneRect.left - stageRect.left + x - 170;
+  if (left < 4) left = 4;
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${top2}px`;
 }
@@ -787,24 +926,6 @@ function zoom(dir) {
   state.view.offset = Math.round(center - state.view.count / 2);
   clampView();
   renderAll();
-}
-
-function onPanStart(e) {
-  state.isPanning = true;
-  state.panStartX = e.clientX;
-  state.panStartOffset = state.view.offset;
-}
-function onPanMove(e) {
-  if (!state.isPanning || !state._geom) return;
-  const dx = e.clientX - state.panStartX;
-  const slot = state._geom.plotWidth / state._geom.count;
-  const deltaCandles = Math.round(-dx / slot);
-  state.view.offset = state.panStartOffset + deltaCandles;
-  clampView();
-  renderAll();
-}
-function onPanEnd() {
-  state.isPanning = false;
 }
 
 window.addEventListener("resize", () => {
@@ -986,6 +1107,7 @@ function setupToolbar() {
   DOM.resetBtn.addEventListener("click", () => {
     state.view.offset = Math.max(0, state.candles.length - 90);
     state.view.count = Math.min(90, state.candles.length);
+    state.paneScale = { price: 1, volume: 1, rsi: 1, macd: 1 };
     renderAll();
   });
 
@@ -1035,7 +1157,7 @@ async function loadCoinData() {
     applyPaneVisibility();
     setLoading(false);
     renderAll();
-    DOM.statusText.textContent = "En directo";
+    DOM.statusText.textContent = "en directo";
   } catch (err) {
     if (err.name === "AbortError") return; // expected: superseded by a newer request
     console.error("No se pudieron cargar los datos del gráfico:", err);
@@ -1045,6 +1167,7 @@ async function loadCoinData() {
 
 function selectCoin(market) {
   state.activeCoin = market;
+  state.paneScale = { price: 1, volume: 1, rsi: 1, macd: 1 };
   updateAssetHeader(market);
   renderWatchlist();
   loadCoinData();
@@ -1071,15 +1194,15 @@ async function init() {
   });
 
   try {
-    DOM.statusText.textContent = "Cargando mercados…";
+    DOM.statusText.textContent = "cargando mercados…";
     state.markets = await fetchMarkets();
-    DOM.statusText.textContent = "En directo";
+    DOM.statusText.textContent = "en directo";
     renderWatchlist();
     const bitcoin = state.markets.find((m) => m.id === "bitcoin") || state.markets[0];
     selectCoin(bitcoin);
   } catch (err) {
     console.error(err);
-    DOM.statusText.textContent = "Error de conexión";
+    DOM.statusText.textContent = "error de conexión";
     setError("No se ha podido conectar con la API de CoinGecko. Comprueba tu conexión o inténtalo de nuevo en unos minutos.");
     DOM.watchlistList.innerHTML = '<div class="search-empty">No se pudieron cargar los mercados.</div>';
   }
