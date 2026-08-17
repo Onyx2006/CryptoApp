@@ -16,11 +16,16 @@ Terminal de mercado de criptomonedas con estética de trading profesional (estil
   - MACD (12, 26, 9) con histograma, en panel independiente
   - Volumen agregado por vela
 - **Crosshair interactivo** sincronizado entre todos los paneles, con tooltip de OHLC y variación %.
-- **Zoom (rueda del ratón) y pan (arrastrar)** sobre el histórico de velas.
+- **Zoom (rueda del ratón o pellizco con dos dedos en táctil) y pan** (arrastrar) sobre el histórico de velas.
+- **Escala de eje ajustable**: pincha y arrastra verticalmente sobre el eje derecho (donde aparecen
+  los números) de cualquier panel —precio, volumen, RSI o MACD— para agrandar o comprimir esa escala.
+  Arriba amplía, abajo aleja. Doble clic la restablece. Funciona igual con ratón y con el dedo.
 - **5 marcos temporales**: 1D, 7D, 30D, 90D, 1A.
 - **Watchlist en vivo** de los 100 principales activos por capitalización, con sparklines de 7 días,
   ordenación (cap. mercado / ganadores / perdedores) y buscador instantáneo.
-- **Diseño responsive**, con foco de teclado visible y `prefers-reduced-motion` respetado.
+- **Totalmente responsive**, con interacciones táctiles nativas (Pointer Events) para pan, zoom,
+  pellizco y ajuste de escala en móvil, foco de teclado visible y `prefers-reduced-motion` respetado.
+- **Favicon propio** en SVG + PNG (velas alcista/bajista con la paleta de marca).
 
 ## Arquitectura
 Tres archivos, sin build step ni dependencias de terceros en producción:
