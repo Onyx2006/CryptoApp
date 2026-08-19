@@ -167,7 +167,18 @@
         <div class="crosshair-tooltip" id="crosshairTooltip" hidden></div>
       </section>
 
-      <p class="chart-attrib">Datos de mercado cortesía de <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a> · velas OHLC en tiempo casi real</p>
+      <p class="chart-attrib">Datos de mercado cortesía de <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a> · velas OHLC en tiempo casi real · arrastra dentro del gráfico o sobre el eje (↕) para moverlo o escalarlo</p>
+
+      <!-- Historical performance -->
+      <section class="performance" id="performanceSection">
+        <div class="performance__head">
+          <span>Rendimiento histórico</span>
+          <span class="performance__hint" id="performanceHint">de <span id="performanceCoinName">Bitcoin</span></span>
+        </div>
+        <div class="performance__grid" id="performanceGrid">
+          <!-- cards injected by JS -->
+        </div>
+      </section>
     </main>
 
     <!-- WATCHLIST SIDEBAR -->
