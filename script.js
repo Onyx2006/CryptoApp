@@ -58,6 +58,9 @@ const DOM = {
 
   watchlistList: document.getElementById("watchlistList"),
   watchlistCount: document.getElementById("watchlistCount"),
+
+  performanceGrid: document.getElementById("performanceGrid"),
+  performanceCoinName: document.getElementById("performanceCoinName"),
 };
 
 const COLORS = {
@@ -90,7 +93,12 @@ const state = {
   // vertical scale applied to each pane's value axis — adjusted by dragging
   // the right-hand axis (price / indicator numbers) up (zoom in) or down (zoom out)
   paneScale: { price: 1, volume: 1, rsi: 1, macd: 1 },
+  // vertical pan applied to each pane, as a fraction of its current visible range —
+  // adjusted by dragging inside the plot area (up/down), independent of horizontal pan
+  paneOffset: { price: 0, volume: 0, rsi: 0, macd: 0 },
+  paneGeom: {}, // last-rendered {top,bottom} pixel bounds per pane, used to convert drag px -> offset fraction
   axisDrag: { active: false, pane: null, startY: 0, startScale: 1, pointerId: null },
+  vPan: { active: false, pane: null, startY: 0, startOffset: 0, rangePx: 1 },
   pointers: new Map(), // active pointers, for touch pan + pinch-to-zoom
   pinch: { active: false, startDist: 0, startCount: 90 },
 };
@@ -100,6 +108,11 @@ const SCALE_MAX = 4;
 
 function clampScale(v) {
   return Math.max(SCALE_MIN, Math.min(SCALE_MAX, v));
+}
+
+function resetPaneAdjustments() {
+  state.paneScale = { price: 1, volume: 1, rsi: 1, macd: 1 };
+  state.paneOffset = { price: 0, volume: 0, rsi: 0, macd: 0 };
 }
 
 /* Rescale a [min,max] value range around a fixed anchor.
@@ -113,6 +126,14 @@ function applyPaneScale(min, max, scale, anchor) {
   const center = (min + max) / 2;
   const half = (max - min) / 2 / scale;
   return { min: center - half, max: center + half };
+}
+
+/* Shift a [min,max] range by a fraction of its own size — this is what makes
+   dragging inside the chart move the visible price/indicator window up or down. */
+function applyPaneOffset(min, max, offsetFraction) {
+  if (!offsetFraction) return { min, max };
+  const shift = (max - min) * offsetFraction;
+  return { min: min + shift, max: max + shift };
 }
 
 let currentController = null; // AbortController for the active chart data fetch
@@ -144,6 +165,22 @@ async function fetchOhlc(id, days, signal) {
 async function fetchVolumeSeries(id, days, signal) {
   const data = await apiGet(`/coins/${id}/market_chart?vs_currency=${VS_CURRENCY}&days=${days}`, { signal });
   return data.total_volumes || [];
+}
+
+/* Full available price history for one coin (daily resolution) — used to compute
+   the historical-performance cards (1S/1M/3M/6M/1A/3A/5A). Fetched once per coin,
+   independent of the candlestick timeframe, so switching 1D/7D/30D/… doesn't refetch it.
+
+   NOTE: CoinGecko's free/public API restricts market_chart to a maximum of ~365 days
+   of history — "days=max" (and days > 365) returns 401 Unauthorized on that tier, which
+   the browser also reports as a CORS error since the error response carries no
+   Access-Control-Allow-Origin header. So we request the largest free-tier-safe window
+   (365 days) instead; periods beyond that (3A/5A) are simply marked unavailable below. */
+const MAX_FREE_HISTORY_DAYS = 365;
+
+async function fetchFullHistory(id, signal) {
+  const data = await apiGet(`/coins/${id}/market_chart?vs_currency=${VS_CURRENCY}&days=${MAX_FREE_HISTORY_DAYS}`, { signal });
+  return data.prices || [];
 }
 
 /* TECHNICAL INDICATORS (pure functions over close-price arrays) */
@@ -379,7 +416,9 @@ function drawTimeAxis(ctx, w, h, start, end) {
 function drawPriceAxis(ctx, w, h, min, max, topPad, bottomPad, formatFn) {
   const plotTop = topPad;
   const plotBottom = h - bottomPad;
-  const steps = 5;
+  const availableH = Math.max(1, plotBottom - plotTop);
+  const MIN_LABEL_GAP = 34; // px — keeps decimal numbers from crowding on short panes
+  const steps = Math.max(2, Math.min(6, Math.floor(availableH / MIN_LABEL_GAP)));
   ctx.save();
   ctx.strokeStyle = COLORS.grid;
   ctx.fillStyle = COLORS.axisText;
@@ -452,8 +491,10 @@ function drawPricePane() {
   min -= pad;
   max += pad;
   ({ min, max } = applyPaneScale(min, max, state.paneScale.price, "center"));
+  ({ min, max } = applyPaneOffset(min, max, state.paneOffset.price));
 
   const top = topPad, bottom = h - bottomPad;
+  state.paneGeom.price = { top, bottom };
   const y = (price) => priceToY(price, min, max, top, bottom);
 
   // grid + price axis
@@ -585,21 +626,26 @@ function drawVolumePane() {
   const { start, end, count, plotWidth } = state._geom;
   const topPad = 6, bottomPad = lastActivePane() === "vol" ? PANE_MARGIN_BOTTOM_AXIS : 4;
   let max = Math.max(...state.volumes.slice(start, end), 1);
+  let min = 0;
   ({ max } = applyPaneScale(0, max, state.paneScale.volume, "zero"));
+  ({ min, max } = applyPaneOffset(min, max, state.paneOffset.volume));
   const top = topPad, bottom = h - bottomPad;
-  drawPriceAxis(ctx, w, h, 0, max, top, h - bottom, fmtCompact);
+  state.paneGeom.volume = { top, bottom };
+  drawPriceAxis(ctx, w, h, min, max, top, h - bottom, fmtCompact);
   if (lastActivePane() === "vol") drawTimeAxis(ctx, w, h, start, end);
 
   const slot = plotWidth / count;
   const bodyW = Math.max(1, slot * 0.6);
   const displayCandles = getDisplayCandles();
+  const y = (v) => priceToY(v, min, max, top, bottom);
+  const baseline = y(0);
   for (let i = start; i < end; i++) {
     const v = state.volumes[i] || 0;
     const x = xForIndex(i, start, count, plotWidth);
-    const barH = (v / max) * (bottom - top);
+    const barY = y(v);
     const bull = displayCandles[i].c >= displayCandles[i].o;
     ctx.fillStyle = bull ? "rgba(23,201,149,0.55)" : "rgba(255,84,112,0.55)";
-    ctx.fillRect(x - bodyW / 2, bottom - barH, bodyW, barH);
+    ctx.fillRect(x - bodyW / 2, Math.min(barY, baseline), bodyW, Math.abs(baseline - barY) || 1);
   }
 }
 
@@ -612,7 +658,9 @@ function drawRsiPane() {
   const { start, end, count, plotWidth } = state._geom;
   const topPad = 10, bottomPad = lastActivePane() === "rsi" ? PANE_MARGIN_BOTTOM_AXIS : 6;
   const top = topPad, bottom = h - bottomPad;
-  const { min: rsiMin, max: rsiMax } = applyPaneScale(0, 100, state.paneScale.rsi, "center");
+  state.paneGeom.rsi = { top, bottom };
+  let { min: rsiMin, max: rsiMax } = applyPaneScale(0, 100, state.paneScale.rsi, "center");
+  ({ min: rsiMin, max: rsiMax } = applyPaneOffset(rsiMin, rsiMax, state.paneOffset.rsi));
   drawPriceAxis(ctx, w, h, rsiMin, rsiMax, top, h - bottom, (v) => v.toFixed(0));
   if (lastActivePane() === "rsi") drawTimeAxis(ctx, w, h, start, end);
 
@@ -650,6 +698,7 @@ function drawMacdPane() {
   const { start, end, count, plotWidth } = state._geom;
   const topPad = 10, bottomPad = lastActivePane() === "macd" ? PANE_MARGIN_BOTTOM_AXIS : 6;
   const top = topPad, bottom = h - bottomPad;
+  state.paneGeom.macd = { top, bottom };
 
   const { macdLine, signalLine, histogram } = indicatorCache.macd;
   let min = 0, max = 0;
@@ -662,6 +711,7 @@ function drawMacdPane() {
   const padv = (max - min) * 0.15;
   min -= padv; max += padv;
   ({ min, max } = applyPaneScale(min, max, state.paneScale.macd, "center"));
+  ({ min, max } = applyPaneOffset(min, max, state.paneOffset.macd));
 
   drawPriceAxis(ctx, w, h, min, max, top, h - bottom, (v) => v.toFixed(2));
   if (lastActivePane() === "macd") drawTimeAxis(ctx, w, h, start, end);
@@ -760,6 +810,7 @@ function onPointerDown(e, key) {
   if (state.pointers.size === 2) {
     state.axisDrag.active = false;
     state.isPanning = false;
+    state.vPan.active = false;
     const pts = [...state.pointers.values()];
     state.pinch.active = true;
     state.pinch.startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
@@ -782,6 +833,13 @@ function onPointerDown(e, key) {
     state.isPanning = true;
     state.panStartX = e.clientX;
     state.panStartOffset = state.view.offset;
+
+    const geom = state.paneGeom[key];
+    state.vPan.active = true;
+    state.vPan.pane = key;
+    state.vPan.startY = e.clientY;
+    state.vPan.startOffset = state.paneOffset[key];
+    state.vPan.rangePx = geom ? Math.max(1, geom.bottom - geom.top) : 1;
   }
 }
 
@@ -805,6 +863,7 @@ function onPointerHover(e, key) {
 function onAxisDoubleClick(e, key) {
   if (!isInAxisZone(e)) return;
   state.paneScale[key] = 1;
+  state.paneOffset[key] = 0;
   renderAll();
 }
 
@@ -838,6 +897,11 @@ function onPointerMoveGlobal(e) {
     const deltaCandles = Math.round(-dx / slot);
     state.view.offset = state.panStartOffset + deltaCandles;
     clampView();
+
+    if (state.vPan.active) {
+      const dy = e.clientY - state.vPan.startY;
+      state.paneOffset[state.vPan.pane] = state.vPan.startOffset + dy / state.vPan.rangePx;
+    }
     renderAll();
   }
 }
@@ -850,6 +914,7 @@ function onPointerUpGlobal(e) {
     state.axisDrag.pointerId = null;
   }
   state.isPanning = false;
+  state.vPan.active = false;
 }
 
 function hideCrosshair() {
@@ -930,7 +995,10 @@ function zoom(dir) {
 
 window.addEventListener("resize", () => {
   clearTimeout(window.__resizeT);
-  window.__resizeT = setTimeout(renderAll, 80);
+  window.__resizeT = setTimeout(() => {
+    renderAll();
+    if (lastPerformancePeriods.length) renderPerformance(lastPerformancePeriods);
+  }, 80);
 });
 
 /* UI — asset header / stats */
@@ -952,9 +1020,8 @@ function updateAssetHeader(market) {
 }
 
 /* WATCHLIST */
-function renderSparkline(canvas, prices, bull) {
+function renderSparkline(canvas, prices, bull, w = 56, h = 28) {
   const dpr = window.devicePixelRatio || 1;
-  const w = 56, h = 28;
   canvas.width = w * dpr; canvas.height = h * dpr;
   canvas.style.width = w + "px"; canvas.style.height = h + "px";
   const ctx = canvas.getContext("2d");
@@ -971,6 +1038,107 @@ function renderSparkline(canvas, prices, bull) {
   ctx.lineWidth = 1.4;
   ctx.lineJoin = "round";
   ctx.stroke();
+}
+
+/* HISTORICAL PERFORMANCE (1S / 1M / 3M / 6M / 1A / 3A / 5A) */
+const PERFORMANCE_PERIODS = [
+  { key: "7d", label: "1 SEMANA", days: 7 },
+  { key: "1m", label: "1 MES", days: 30 },
+  { key: "3m", label: "3 MESES", days: 90 },
+  { key: "6m", label: "6 MESES", days: 180 },
+  { key: "1y", label: "1 AÑO", days: 365 },
+  { key: "3y", label: "3 AÑOS", days: 365 * 3 },
+  { key: "5y", label: "5 AÑOS", days: 365 * 5 },
+];
+
+let performanceController = null;
+let lastPerformancePeriods = [];
+
+function computePerformancePeriods(pricePoints) {
+  if (!pricePoints || pricePoints.length < 2) return [];
+  const now = pricePoints[pricePoints.length - 1];
+  const nowPrice = now[1];
+  const oldestTs = pricePoints[0][0];
+
+  return PERFORMANCE_PERIODS.map((period) => {
+    // CoinGecko's free public API only gives us up to MAX_FREE_HISTORY_DAYS of
+    // history (see fetchFullHistory) — periods beyond that can never be computed
+    // here, regardless of how old the coin is, so we say so explicitly.
+    if (period.days > MAX_FREE_HISTORY_DAYS) {
+      return { ...period, available: false, reason: "plan-limit" };
+    }
+
+    const targetTs = now[0] - period.days * 86400000;
+    if (targetTs < oldestTs) return { ...period, available: false, reason: "no-history" };
+
+    // first point at or after the target timestamp
+    let idx = pricePoints.findIndex((p) => p[0] >= targetTs);
+    if (idx === -1) idx = 0;
+    const pastPrice = pricePoints[idx][1];
+    const pct = pastPrice ? ((nowPrice - pastPrice) / pastPrice) * 100 : null;
+    const slice = pricePoints.slice(idx).map((p) => p[1]);
+    return { ...period, available: pct != null, pct, sparkline: slice };
+  });
+}
+
+async function loadPerformance(coinId) {
+  if (performanceController) performanceController.abort();
+  performanceController = new AbortController();
+  const { signal } = performanceController;
+
+  DOM.performanceCoinName.textContent = state.activeCoin ? state.activeCoin.name : "";
+  DOM.performanceGrid.innerHTML = Array.from({ length: 7 })
+    .map(() => '<div class="perf-card perf-card--skeleton"></div>')
+    .join("");
+
+  try {
+    const prices = await fetchFullHistory(coinId, signal);
+    if (signal.aborted) return;
+    if (state.activeCoin && state.activeCoin.id !== coinId) return; // superseded by a newer selection
+    renderPerformance(computePerformancePeriods(prices));
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    console.error("No se pudo cargar el rendimiento histórico:", err);
+    DOM.performanceGrid.innerHTML = '<div class="perf-empty">No se pudo cargar el rendimiento histórico.</div>';
+  }
+}
+
+function renderPerformance(periods) {
+  lastPerformancePeriods = periods;
+  DOM.performanceGrid.innerHTML = "";
+  if (!periods.length) {
+    DOM.performanceGrid.innerHTML = '<div class="perf-empty">Sin histórico suficiente para este activo.</div>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  periods.forEach((p) => {
+    const card = document.createElement("div");
+    card.className = "perf-card";
+    if (!p.available) {
+      card.classList.add("perf-card--empty");
+      const note = p.reason === "plan-limit" ? "requiere API de pago" : "sin histórico";
+      card.innerHTML = `
+        <div class="perf-card__label">${p.label}</div>
+        <div class="perf-card__pct perf-card__pct--empty">N/D</div>
+        <div class="perf-card__note">${note}</div>
+      `;
+      frag.appendChild(card);
+      return;
+    }
+    const bull = p.pct >= 0;
+    card.innerHTML = `
+      <div class="perf-card__label">${p.label}</div>
+      <div class="perf-card__pct ${bull ? "is-up" : "is-down"}">${fmtPct(p.pct)}</div>
+      <canvas class="perf-card__spark"></canvas>
+    `;
+    const canvas = card.querySelector(".perf-card__spark");
+    requestAnimationFrame(() => {
+      const rect = canvas.getBoundingClientRect();
+      renderSparkline(canvas, p.sparkline, bull, Math.max(40, Math.round(rect.width)), Math.max(24, Math.round(rect.height)));
+    });
+    frag.appendChild(card);
+  });
+  DOM.performanceGrid.appendChild(frag);
 }
 
 function getSortedMarkets() {
@@ -1108,6 +1276,7 @@ function setupToolbar() {
     state.view.offset = Math.max(0, state.candles.length - 90);
     state.view.count = Math.min(90, state.candles.length);
     state.paneScale = { price: 1, volume: 1, rsi: 1, macd: 1 };
+    state.paneOffset = { price: 0, volume: 0, rsi: 0, macd: 0 };
     renderAll();
   });
 
@@ -1168,9 +1337,11 @@ async function loadCoinData() {
 function selectCoin(market) {
   state.activeCoin = market;
   state.paneScale = { price: 1, volume: 1, rsi: 1, macd: 1 };
+  state.paneOffset = { price: 0, volume: 0, rsi: 0, macd: 0 };
   updateAssetHeader(market);
   renderWatchlist();
   loadCoinData();
+  loadPerformance(market.id);
 }
 
 /* BOOTSTRAP */
